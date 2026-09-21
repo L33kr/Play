@@ -26,7 +26,7 @@ jobs:
           ./gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
       - uses: actions/upload-artifact@v4
         with:
-          name: ShikiMove-0.2.0-debug
+          name: ShikiMove-0.2.1-debug
           path: app/build/outputs/apk/debug/app-debug.apk
       - uses: actions/upload-artifact@v4
         if: always()
@@ -45,7 +45,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          name: ShikiMove-0.2.0-debug
+          name: ShikiMove-0.2.1-debug
           path: release
       - name: Publish verified test APK once
         env:
@@ -53,10 +53,10 @@ jobs:
           GH_REPO: ${{ github.repository }}
           COMMIT: ${{ github.sha }}
         run: |
-          if gh release view v0.2.0 >/dev/null 2>&1; then
-            echo "v0.2.0 already exists; published assets are kept unchanged."
+          if gh release view v0.2.1 >/dev/null 2>&1; then
+            echo "v0.2.1 already exists; published assets are kept unchanged."
             exit 0
           fi
-          mv release/app-debug.apk release/ShikiMove-0.2.0-debug.apk
-          (cd release && sha256sum ShikiMove-0.2.0-debug.apk > SHA256SUMS)
-          gh release create v0.2.0 release/ShikiMove-0.2.0-debug.apk release/SHA256SUMS --target "$COMMIT" --title "ShikiMove 0.2.0" --notes-file RELEASE_NOTES.md --prerelease
+          mv release/app-debug.apk release/ShikiMove-0.2.1-debug.apk
+          (cd release && sha256sum ShikiMove-0.2.1-debug.apk > SHA256SUMS)
+          gh release create v0.2.1 release/ShikiMove-0.2.1-debug.apk release/SHA256SUMS --target "$COMMIT" --title "ShikiMove 0.2.1" --notes-file RELEASE_NOTES.md --prerelease

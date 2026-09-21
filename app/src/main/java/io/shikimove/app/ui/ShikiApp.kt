@@ -14,7 +14,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -27,7 +26,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -36,7 +34,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import io.shikimove.app.*
 import io.shikimove.app.data.*
-import io.shikimove.app.player.PlayerActivity
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 @Composable fun ShikiApp(vm: MainViewModel = viewModel()) {
@@ -148,7 +145,7 @@ import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
     }
 }
 
-@Composable private fun Poster(anime: Anime, base: String, modifier: Modifier) {
+@Composable internal fun Poster(anime: Anime, base: String, modifier: Modifier) {
     val path = anime.image?.original ?: anime.image?.preview
     val url = path?.let { base.toHttpUrlOrNull()?.resolve(it)?.toString() }
     Box(modifier.background(Panel), contentAlignment = Alignment.Center) {
@@ -194,123 +191,6 @@ import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
             AnimeRow(progress.anime, base, "Серия ${progress.episode} · ${timeLabel(progress.seconds)}\n${progress.source.translationLabel}", { open(progress.anime) }, play = true)
         }
     }
-}
-
-@Composable private fun DetailPage(state: DetailState, entry: LibraryEntry?, progress: WatchProgress?, settings: AppSettings, vm: MainViewModel) {
-    val anime = state.anime
-    val context = LocalContext.current
-    var shelfDialog by remember { mutableStateOf(false) }
-    var translations by remember { mutableStateOf(false) }
-    var selectedSource by rememberSaveable(anime.id) { mutableStateOf<String?>(null) }
-    var selectedSeason by rememberSaveable(anime.id) { mutableIntStateOf(progress?.season?.takeIf { it >= 0 } ?: 1) }
-    var seasonMenu by remember { mutableStateOf(false) }
-    var scoreMenu by remember { mutableStateOf(false) }
-    var episode by rememberSaveable(anime.id) { mutableStateOf((progress?.episode ?: 1).toString()) }
-    val sources = state.sources?.sources.orEmpty()
-    val source = sources.find { it.id == selectedSource } ?: sources.find { it.translation?.id == progress?.source?.translation?.id } ?: sources.firstOrNull()
-    LaunchedEffect(source?.id, selectedSeason) {
-        if (source != null) {
-            val keys = source.playlist
-            if (keys.none { it.season == selectedSeason }) selectedSeason = keys.firstOrNull()?.season ?: 1
-            if (EpisodeKey(selectedSeason, episode.toIntOrNull() ?: 1) !in keys) episode = keys.firstOrNull { it.season == selectedSeason }?.episode?.toString() ?: "1"
-        }
-    }
-    val episodeNumber = episode.toIntOrNull()
-    val validEpisode = source != null && episodeNumber != null && EpisodeKey(selectedSeason, episodeNumber) in source.playlist
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 28.dp)) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = vm::close) { Symbol("back", description = "Назад") }
-            Spacer(Modifier.weight(1f))
-            TextButton(onClick = { openBrowser(context, "${settings.shikiBase}/animes/${anime.id}") }) { Text("Shikimori"); Spacer(Modifier.width(8.dp)); Symbol("external", Modifier.size(18.dp), Lavender) }
-        }
-        Row(Modifier.padding(horizontal = 22.dp), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-            Poster(anime, settings.shikiBase, Modifier.width(120.dp).height(176.dp).clip(RoundedCornerShape(18.dp)))
-            Column(Modifier.weight(1f).padding(top = 6.dp)) {
-                Text(anime.statusLabel.uppercase(), color = Lavender, fontSize = 10.sp, letterSpacing = 1.sp)
-                Text("${anime.year} · ${anime.format}", Modifier.padding(top = 14.dp), color = Muted)
-                Text("★ ${anime.score ?: "—"}", Modifier.padding(top = 12.dp), fontSize = 26.sp, fontWeight = FontWeight.SemiBold)
-                Text(if (anime.episodes > 0) "${anime.episodes} серий" else "Серий вышло: ${anime.episodesAired}", Modifier.padding(top = 10.dp), color = Muted)
-            }
-        }
-        Text(anime.title, Modifier.padding(start = 22.dp, end = 22.dp, top = 24.dp), style = MaterialTheme.typography.headlineLarge)
-        if (anime.title != anime.name) Text(anime.name, Modifier.padding(start = 22.dp, end = 22.dp, top = 7.dp), color = Muted)
-        OutlinedButton(onClick = { shelfDialog = true }, Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 18.dp), shape = RoundedCornerShape(14.dp)) {
-            Symbol("bookmark", Modifier.size(18.dp), Lavender); Spacer(Modifier.width(10.dp)); Text(entry?.shelf?.label ?: "Добавить в мой список")
-        }
-        if (entry != null) Row(Modifier.fillMaxWidth().padding(horizontal = 22.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("Просмотрено: ${entry.episodes}", Modifier.weight(1f), color = Muted)
-            Box { TextButton(onClick = { scoreMenu = true }) { Text(if (entry.score > 0) "★ ${entry.score} / 10" else "Оценить") }
-                DropdownMenu(scoreMenu, { scoreMenu = false }) { (0..10).forEach { score -> DropdownMenuItem(text = { Text(if (score == 0) "Без оценки" else "$score / 10") }, onClick = { vm.store.setScore(anime, score); scoreMenu = false }) } }
-            }
-        }
-        Surface(Modifier.fillMaxWidth().padding(horizontal = 20.dp), shape = RoundedCornerShape(16.dp), color = Panel) {
-            Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Смотреть", style = MaterialTheme.typography.titleLarge)
-                when {
-                    state.sourcesLoading -> { LinearProgressIndicator(Modifier.fillMaxWidth()); Text("Подбираем озвучки…", color = Muted) }
-                    state.sourceError != null -> { Text(state.sourceError, color = Muted); TextButton(onClick = { vm.loadSources() }) { Text("Повторить поиск плеера") } }
-                    source == null -> Text("Совпадающий источник не найден. Можно проверить наличие на amove.", color = Muted)
-                    else -> {
-                        if (state.sources?.exact == false) Text("Найдено по названию. Проверь, что это нужный сезон.", color = MaterialTheme.colorScheme.secondary, style = MaterialTheme.typography.bodySmall)
-                        Box {
-                            OutlinedButton(onClick = { translations = true }, Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
-                                Text(source.translationLabel, Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Text(if (source.translation?.type == "subtitles") "СУБ" else "ОЗВ", color = Muted, fontSize = 10.sp)
-                            }
-                            DropdownMenu(expanded = translations, onDismissRequest = { translations = false }) {
-                                sources.forEach { candidate -> DropdownMenuItem(text = { Column {
-                                    Text(candidate.translationLabel)
-                                    Text("${candidate.episodeLimit} серий · ${if (candidate.translation?.type == "subtitles") "Субтитры" else "Озвучка"}", color = Muted, style = MaterialTheme.typography.bodySmall)
-                                } }, onClick = { selectedSource = candidate.id; translations = false }) }
-                            }
-                        }
-                        val seasons = source.playlist.map { it.season }.distinct()
-                        if (seasons.size > 1) Box {
-                            TextButton(onClick = { seasonMenu = true }) { Text(source.seasonLabel(selectedSeason)) }
-                            DropdownMenu(seasonMenu, { seasonMenu = false }) { seasons.forEach { value -> DropdownMenuItem(text = { Text(source.seasonLabel(value)) }, onClick = { selectedSeason = value; seasonMenu = false }) } }
-                        }
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            OutlinedTextField(episode, { if (it.length <= 5 && it.all(Char::isDigit)) episode = it },
-                                Modifier.width(110.dp), label = { Text("Серия") }, singleLine = true,
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), isError = !validEpisode, shape = RoundedCornerShape(12.dp))
-                            Text("Доступно: ${source.playlist.count { it.season == selectedSeason }}\n${source.quality.orEmpty()}", color = Muted, style = MaterialTheme.typography.bodySmall)
-                        }
-                        val resume = progress?.takeIf { it.season == selectedSeason && it.episode == episodeNumber && it.source.translation?.id == source.translation?.id }
-                        Button(onClick = {
-                            PlayerActivity.launch(context, anime, source, episodeNumber ?: 1, resume?.seconds ?: 0.0, sources, selectedSeason)
-                        }, enabled = validEpisode, modifier = Modifier.fillMaxWidth().height(52.dp), shape = RoundedCornerShape(14.dp)) {
-                            Symbol("play", Modifier.size(20.dp), MaterialTheme.colorScheme.onPrimary); Spacer(Modifier.width(10.dp))
-                            Text(if ((resume?.seconds ?: 0.0) > 5) "Продолжить с ${timeLabel(resume!!.seconds)}" else "Смотреть серию ${episodeNumber ?: "—"}")
-                        }
-                        if ((resume?.seconds ?: 0.0) > 5) TextButton(onClick = { PlayerActivity.launch(context, anime, source, episodeNumber ?: 1, 0.0, sources, selectedSeason) }, modifier = Modifier.align(Alignment.CenterHorizontally)) { Text("Начать серию сначала") }
-                    }
-                }
-                TextButton(onClick = { openBrowser(context, SourceResolver.amoveUrl(anime.id, source?.id.orEmpty())) }, modifier = Modifier.align(Alignment.CenterHorizontally)) {
-                    Text("Открыть amove"); Spacer(Modifier.width(8.dp)); Symbol("external", Modifier.size(16.dp), Lavender)
-                }
-            }
-        }
-        FlowRow(Modifier.padding(horizontal = 22.dp, vertical = 18.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            anime.genres.orEmpty().forEach { genre ->
-                Surface(color = Panel, shape = RoundedCornerShape(18.dp), modifier = Modifier.padding(bottom = 8.dp)) {
-                    Text(genre.russian ?: genre.name.orEmpty(), Modifier.padding(horizontal = 12.dp, vertical = 7.dp), color = Muted, style = MaterialTheme.typography.bodySmall)
-                }
-            }
-        }
-        Text("Об аниме", Modifier.padding(horizontal = 22.dp), style = MaterialTheme.typography.titleLarge)
-        if (state.loading) Loading("Загружаем описание…") else {
-            val description = anime.description.orEmpty().replace(Regex("\\[/?[^]\\n]+]"), "").trim()
-            Text(description.ifBlank { "Описания пока нет." }, Modifier.padding(horizontal = 22.dp, vertical = 14.dp), color = Muted, style = MaterialTheme.typography.bodyLarge)
-            if (state.error != null) ErrorCard(state.error) { vm.open(anime) }
-        }
-    }
-    if (shelfDialog) AlertDialog(onDismissRequest = { shelfDialog = false }, title = { Text("Мой список") }, text = {
-        Column { Shelf.entries.forEach { shelf ->
-            TextButton(onClick = { vm.store.setShelf(anime, shelf); shelfDialog = false }, Modifier.fillMaxWidth()) { Text(shelf.label, Modifier.fillMaxWidth()) }
-        }
-            if (entry != null) TextButton(onClick = { vm.store.setShelf(anime, null); shelfDialog = false }) { Text("Удалить из списка", color = MaterialTheme.colorScheme.error) }
-        }
-    }, confirmButton = { TextButton(onClick = { shelfDialog = false }) { Text("Закрыть") } })
 }
 
 @Composable private fun SettingsPage(settings: AppSettings, vm: MainViewModel) {
