@@ -1,0 +1,2 @@
+-keepattributes Signature,*Annotation*
+-keep class io.shikimove.app.data.** { *; }
