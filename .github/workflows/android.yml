@@ -36,21 +36,27 @@ jobs:
             app/build/reports/tests
             app/build/reports/lint-results-debug.html
   release:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: build
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           name: ShikiMove-0.2.0-debug
           path: release
-      - name: Publish test APK
+      - name: Publish verified test APK once
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          TAG: ${{ github.ref_name }}
+          COMMIT: ${{ github.sha }}
         run: |
-          mv release/app-debug.apk release/ShikiMove-${TAG#v}-debug.apk
-          gh release create "$TAG" release/*.apk --title "ShikiMove $TAG" --generate-notes --prerelease
+          if gh release view v0.2.0 >/dev/null 2>&1; then
+            echo "v0.2.0 already exists; published assets are kept unchanged."
+            exit 0
+          fi
+          mv release/app-debug.apk release/ShikiMove-0.2.0-debug.apk
+          (cd release && sha256sum ShikiMove-0.2.0-debug.apk > SHA256SUMS)
+          gh release create v0.2.0 release/ShikiMove-0.2.0-debug.apk release/SHA256SUMS --target "$COMMIT" --title "ShikiMove 0.2.0" --notes-file RELEASE_NOTES.md --prerelease

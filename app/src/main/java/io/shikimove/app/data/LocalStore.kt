@@ -5,7 +5,7 @@ import com.google.gson.Gson
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-class LocalStore private constructor(context: Context) {
+class LocalStore internal constructor(context: Context) {
     private val prefs = context.applicationContext.getSharedPreferences("shikimove", Context.MODE_PRIVATE)
     private val gson = Gson()
     private val _user = MutableStateFlow(read("account", ShikiUser::class.java))
