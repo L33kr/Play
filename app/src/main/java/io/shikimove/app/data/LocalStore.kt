@@ -12,7 +12,7 @@ class LocalStore private constructor(context: Context) {
     val user = _user.asStateFlow()
     private fun key(name: String) = _user.value?.let { "${name}_user_${it.id}" } ?: name
     private val _library = MutableStateFlow(read(key("library"), Array<LibraryEntry>::class.java)?.toList().orEmpty())
-    private val _history = MutableStateFlow(read(key("history"), Array<WatchProgress>::class.java)?.toList().orEmpty())
+    private val _history = MutableStateFlow(readHistory())
     private val _pending = MutableStateFlow(read(key("pending"), Array<PendingRate>::class.java)?.toList().orEmpty())
     private val _settings = MutableStateFlow(read("settings", AppSettings::class.java) ?: AppSettings())
     val library = _library.asStateFlow()
@@ -22,13 +22,23 @@ class LocalStore private constructor(context: Context) {
     private fun <T> read(key: String, type: Class<T>): T? = runCatching { gson.fromJson(prefs.getString(key, null), type) }.getOrNull()
     private fun write(name: String, value: Any) { prefs.edit().putString(key(name), gson.toJson(value)).commit() }
 
+    private fun readHistory(): List<WatchProgress> {
+        val raw = prefs.getString(key("history"), null) ?: return emptyList()
+        return runCatching {
+            com.google.gson.JsonParser.parseString(raw).asJsonArray.map { item ->
+                val progress = gson.fromJson(item, WatchProgress::class.java)
+                if (item.asJsonObject.has("season")) progress else progress.copy(season = 1)
+            }
+        }.getOrDefault(emptyList())
+    }
+
     @Synchronized fun account(value: ShikiUser?) {
         val previous = _user.value?.id
         _user.value = value
         prefs.edit().putString("account", gson.toJson(value)).commit()
         if (previous == value?.id) return
         _library.value = read(key("library"), Array<LibraryEntry>::class.java)?.toList().orEmpty()
-        _history.value = read(key("history"), Array<WatchProgress>::class.java)?.toList().orEmpty()
+        _history.value = readHistory()
         _pending.value = read(key("pending"), Array<PendingRate>::class.java)?.toList().orEmpty()
     }
 
@@ -58,7 +68,7 @@ class LocalStore private constructor(context: Context) {
             old?.shelf?.takeIf { it == Shelf.REWATCHING || it == Shelf.COMPLETED } ?: Shelf.WATCHING
         _library.value = listOf((old ?: LibraryEntry(anime, shelf)).copy(shelf = shelf, episodes = count, changedAt = System.currentTimeMillis())) + _library.value.filterNot { it.anime.id == anime.id }
         write("library", _library.value)
-        queue(anime) { (it?.takeUnless(PendingRate::delete) ?: PendingRate(anime)).copy(status = shelf.apiValue,
+        queue(anime) { (it?.takeUnless(PendingRate::delete) ?: PendingRate(anime)).copy(status = it?.status?.takeIf { _ -> !it.automatic } ?: shelf.apiValue,
             episodes = maxOf(count, it?.episodes ?: 0), automatic = it?.let { pending -> pending.automatic || pending.status == null } ?: true, revision = revision()) }
     }
 

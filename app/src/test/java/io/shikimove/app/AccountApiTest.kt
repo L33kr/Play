@@ -26,6 +26,10 @@ class AccountApiTest {
         val fields = AccountApi.mutationFields(42, PendingRate(Anime(id=9253), episodes=3), UserRate(id=99,episodes=12))
         assertEquals(12, fields["episodes"])
     }
+    @Test fun `stale automatic progress preserves completed status`() {
+        val fields = AccountApi.mutationFields(42, PendingRate(Anime(id=9253), status="watching", episodes=3, automatic=true), UserRate(id=99,status="completed",episodes=24))
+        assertFalse(fields.containsKey("status")); assertEquals(24, fields["episodes"])
+    }
     @Test fun `new entry has owner and target and explicit zero score`() {
         val fields = AccountApi.mutationFields(42, PendingRate(Anime(id=9253), status="watching",score=0), null)
         assertEquals(42L, fields["user_id"]); assertEquals(9253L, fields["target_id"]); assertEquals(0, fields["score"])

@@ -9,6 +9,7 @@ import kotlinx.coroutines.sync.withLock
 
 data class SyncState(val running: Boolean = false, val error: String? = null, val lastSync: Long? = null, val needsLogin: Boolean = false)
 
+@OptIn(FlowPreview::class)
 class AccountRepository private constructor(context: Context) {
     val store = LocalStore.get(context)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)

@@ -1,4 +1,4 @@
-@file:OptIn(androidx.media3.common.util.UnstableApi::class, androidx.compose.material3.ExperimentalMaterial3Api::class)
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 package io.shikimove.app.player
 
 import android.content.Context
@@ -44,6 +44,7 @@ import kotlinx.coroutines.*
 import java.io.File
 import java.util.UUID
 
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class PlayerActivity : ComponentActivity() {
     data class Payload(val anime: Anime, val source: VideoSource, val episode: Int, val seconds: Double, val sources: List<VideoSource>, val season: Int = 1)
     private lateinit var payload: Payload
@@ -115,6 +116,7 @@ class PlayerActivity : ComponentActivity() {
             var ticks = 0
             while (isActive) {
                 delay(500)
+                if (streams == null) continue
                 val next = player.currentPosition.coerceAtLeast(0)
                 if (playing && next >= position && next - position < 4000) watchedSeconds += (next - position) / 1000.0
                 position = next; duration = player.duration.coerceAtLeast(0)
